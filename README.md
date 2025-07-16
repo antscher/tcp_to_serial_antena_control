@@ -83,6 +83,6 @@ pip install pyserial
 
 ## Images
 
-![Gpredict Antenna Control Screenshot](images/Gpredictantenna.png)
+![Gpredict Antenna Control Screenshot](Gpredictantenna.png)
 
 
