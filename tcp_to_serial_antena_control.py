@@ -3,55 +3,72 @@ import time
 import threading
 import serial
 
-# TCP parameters for Gpredict
+# TCP server parameters for Gpredict
 TCP_HOST = "localhost"
 TCP_PORT = 4533
 
-# Serial ports for azimuth and elevation (Set your correct COM ports here)
-COM_AZ = "COM3"   # Replace with your azimuth COM port
-COM_EL = "COM4"   # Replace with your elevation COM port
+# Serial parameters
+SERIAL_AZ_PORT = "COM3"   # Replace with your azimuth COM port
+SERIAL_EL_PORT = "COM4"   # Replace with your elevation COM port
 SERIAL_BAUD = 9600
 
-# Current positions (updated by serial feedback)
+# Shared current positions
 current_az = 0.0
 current_el = 0.0
 
-# Lock to ensure thread-safe updates of shared variables
+# Locks for thread-safe variable access
 lock = threading.Lock()
 
-def read_serial(ser, axis):
+def serial_reader_az(ser):
     """
-    Thread function to read serial data from the motor controller.
-    Parses the feedback and updates the current position for azimuth or elevation.
+    Thread function to read AZIMUTH feedback from the controller.
     """
-    global current_az, current_el
+    global current_az
 
     while True:
         line = ser.readline().decode(errors='ignore').strip()
         if not line:
-            continue  # Skip empty lines
+            continue
 
-        # Expecting feedback in format: A=xxx.x S=x M or E=xxx.x S=x M
-        if line.startswith(axis + "="):
+        if line.startswith("A="):
             parts = line.split()
-            pos = float(parts[0][2:])  # Extract numeric position
+            az = float(parts[0][2:])  # Parse azimuth value
 
-            # Update global position in a thread-safe way
             with lock:
-                if axis == "A":
-                    current_az = pos
-                else:
-                    current_el = pos
+                current_az = az
 
-            print(f"[{axis}] Feedback: {line}")
+            print(f"[AZIMUTH SERIAL] {line}")
 
         elif line.startswith("ERR="):
-            print(f"[{axis}] ERROR: {line}")
+            print(f"[AZIMUTH SERIAL] ERROR: {line}")
+
+def serial_reader_el(ser):
+    """
+    Thread function to read ELEVATION feedback from the controller.
+    """
+    global current_el
+
+    while True:
+        line = ser.readline().decode(errors='ignore').strip()
+        if not line:
+            continue
+
+        if line.startswith("E="):
+            parts = line.split()
+            el = float(parts[0][2:])  # Parse elevation value
+
+            with lock:
+                current_el = el
+
+            print(f"[ELEVATION SERIAL] {line}")
+
+        elif line.startswith("ERR="):
+            print(f"[ELEVATION SERIAL] ERROR: {line}")
 
 def tcp_server(ser_az, ser_el):
     """
-    TCP server to communicate with Gpredict using rotctl protocol.
-    Handles 'p' for position request and 'P az el' for movement commands.
+    TCP server compatible with Gpredict.
+    Handles position requests and movement commands for AZ and EL.
     """
     global current_az, current_el
 
@@ -71,48 +88,53 @@ def tcp_server(ser_az, ser_el):
                 break  # Client disconnected
 
             command = data.decode().strip()
-            print(f"Command received: {command}")
+            print(f"[TCP] Command received: {command}")
 
             if command == "p":
-                # Gpredict asks for current position
+                # Return current position
                 with lock:
                     response = f"{current_az:.1f}\n{current_el:.1f}\n"
                 conn.sendall(response.encode())
-                print(f"Position sent: {response.strip()}")
+                print(f"[TCP] Position sent: {response.strip()}")
 
             elif command.startswith("P "):
-                # Gpredict sends a move command (P <az> <el>)
+                # Move to new position: P <az> <el>
                 parts = command.split()
                 if len(parts) == 3:
                     az = float(parts[1].replace(",", "."))
                     el = float(parts[2].replace(",", "."))
 
-                    # Format motor controller commands: A<az> and E<el> with carriage return
+                    # Send commands to azimuth and elevation controllers
                     cmd_az = f"A{az:.1f}\r"
                     cmd_el = f"E{el:.1f}\r"
 
-                    # Send commands to azimuth and elevation controllers
                     ser_az.write(cmd_az.encode())
                     ser_el.write(cmd_el.encode())
 
-                    print(f"[AZ] Command sent: {cmd_az.strip()}")
-                    print(f"[EL] Command sent: {cmd_el.strip()}")
+                    print(f"[AZIMUTH SERIAL] Command sent: {cmd_az.strip()}")
+                    print(f"[ELEVATION SERIAL] Command sent: {cmd_el.strip()}")
 
-        conn.close()  # Close TCP connection when client disconnects
+                    # Return updated positions (instantaneous)
+                    with lock:
+                        response = f"{current_az:.1f}\n{current_el:.1f}\n"
+                    conn.sendall(response.encode())
+                    print(f"[TCP] Position sent: {response.strip()}")
+
+        conn.close()
+        print("[TCP] Client disconnected")
 
 def main():
     """
-    Main function to initialize serial ports, start serial reading threads, 
-    and run the TCP server for Gpredict communication.
+    Main function: initializes serial ports, launches readers, starts TCP server.
     """
-    # Initialize serial connections
-    ser_az = serial.Serial(COM_AZ, SERIAL_BAUD, timeout=1)
-    ser_el = serial.Serial(COM_EL, SERIAL_BAUD, timeout=1)
-    time.sleep(2)  # Allow time for serial ports to initialize
+    # Open serial connections for azimuth and elevation
+    ser_az = serial.Serial(SERIAL_AZ_PORT, SERIAL_BAUD, timeout=1)
+    ser_el = serial.Serial(SERIAL_EL_PORT, SERIAL_BAUD, timeout=1)
+    time.sleep(2)  # Allow hardware to initialize
 
-    # Launch reading threads for azimuth and elevation
-    threading.Thread(target=read_serial, args=(ser_az, "A"), daemon=True).start()
-    threading.Thread(target=read_serial, args=(ser_el, "E"), daemon=True).start()
+    # Start serial reader threads
+    threading.Thread(target=serial_reader_az, args=(ser_az,), daemon=True).start()
+    threading.Thread(target=serial_reader_el, args=(ser_el,), daemon=True).start()
 
     # Start TCP server loop
     tcp_server(ser_az, ser_el)
