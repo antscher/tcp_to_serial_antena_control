@@ -125,19 +125,21 @@ def tcp_server(ser_az, ser_el):
 
 def main():
     """
-    Main function: initializes serial ports, launches readers, starts TCP server.
+    Main function to initialize serial ports, start serial reading threads, 
+    and run the TCP server for Gpredict communication.
     """
-    # Open serial connections for azimuth and elevation
+    # Initialize serial connections
     ser_az = serial.Serial(SERIAL_AZ_PORT, SERIAL_BAUD, timeout=1)
     ser_el = serial.Serial(SERIAL_EL_PORT, SERIAL_BAUD, timeout=1)
-    time.sleep(2)  # Allow hardware to initialize
+    time.sleep(2)  # Allow time for serial ports to initialize
 
-    # Start serial reader threads
+    # Launch reading threads for azimuth and elevation
     threading.Thread(target=serial_reader_az, args=(ser_az,), daemon=True).start()
     threading.Thread(target=serial_reader_el, args=(ser_el,), daemon=True).start()
 
     # Start TCP server loop
     tcp_server(ser_az, ser_el)
+
 
 if __name__ == "__main__":
     main()
