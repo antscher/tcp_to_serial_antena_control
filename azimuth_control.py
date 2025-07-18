@@ -76,7 +76,8 @@ def main():
                     cmd = f"A{az:.1f}\r"
                     ser.write(cmd.encode())
                     print(f"[SERIAL] Commande envoyée : {cmd.strip()}")
-                    response = f"{current_az:.1f}\n{0.0:.1f}\n"   # Elévation fixée à 0.0
+                    with lock:
+                        response = f"{current_az:.1f}\n{0.0:.1f}\n"   # Elévation fixée à 0.0
                     conn.sendall(response.encode())
                     print(f"Réponse envoyée : {response.strip()}")
 
