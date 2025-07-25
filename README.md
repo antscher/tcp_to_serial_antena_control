@@ -81,6 +81,12 @@ COM_EL = "COM4"   # Replace with your elevation COM port
 pip install pyserial
 ```
 
+ ## Run the program 
+
+```bash
+pyton tcp_to_serial_antena_control.py
+```
+
 ## Images
 
 ![Gpredict Antenna Control Screenshot](Gpredictantenna.png)
