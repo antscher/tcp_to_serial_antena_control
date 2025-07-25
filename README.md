@@ -86,6 +86,7 @@ pip install pyserial
 ```bash
 pyton tcp_to_serial_antena_control.py
 ```
+Then open in GPredict control antena -> Engage
 
 ## Images
 
