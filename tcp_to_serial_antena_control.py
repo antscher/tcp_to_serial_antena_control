@@ -8,8 +8,8 @@ TCP_HOST = "localhost"
 TCP_PORT = 4533
 
 # Serial parameters
-SERIAL_AZ_PORT = "COM3"   # Replace with your azimuth COM port
-SERIAL_EL_PORT = "COM4"   # Replace with your elevation COM port
+SERIAL_AZ_PORT = "COM26"   # Replace with your azimuth COM port
+SERIAL_EL_PORT = "COM7"   # Replace with your elevation COM port
 SERIAL_BAUD = 9600
 
 # Shared current positions
@@ -32,15 +32,13 @@ def serial_reader_az(ser):
 
         if line.startswith("A="):
             parts = line.split()
-            az = float(parts[0][2:])  # Parse azimuth value
-
+            az = float(parts[0][2:])
             with lock:
                 current_az = az
-
-            print(f"[AZIMUTH SERIAL] {line}")
+            print(f"[SERIAL] {line}")
 
         elif line.startswith("ERR="):
-            print(f"[AZIMUTH SERIAL] ERROR: {line}")
+            print(f"[SERIAL] ERREUR: {line}")
 
 def serial_reader_el(ser):
     """
@@ -51,19 +49,22 @@ def serial_reader_el(ser):
     while True:
         line = ser.readline().decode(errors='ignore').strip()
         if not line:
-            continue
+            continue  # Skip empty lines
 
+        # Expecting feedback in format: E=xxx.x S=x M or E=xxx.x S=x S
         if line.startswith("E="):
             parts = line.split()
-            el = float(parts[0][2:])  # Parse elevation value
+            el = float(parts[0][2:])  # Extract elevation value
 
+            # Thread-safe update of the shared variable
             with lock:
                 current_el = el
 
-            print(f"[ELEVATION SERIAL] {line}")
+            print(f"[SERIAL] Feedback: {line}")
 
         elif line.startswith("ERR="):
-            print(f"[ELEVATION SERIAL] ERROR: {line}")
+            print(f"[SERIAL] ERROR: {line}")
+
 
 def tcp_server(ser_az, ser_el):
     """
@@ -109,6 +110,7 @@ def tcp_server(ser_az, ser_el):
                     cmd_el = f"E{el:.1f}\r"
 
                     ser_az.write(cmd_az.encode())
+                    time.sleep(0.5) 
                     ser_el.write(cmd_el.encode())
 
                     print(f"[AZIMUTH SERIAL] Command sent: {cmd_az.strip()}")
@@ -119,6 +121,9 @@ def tcp_server(ser_az, ser_el):
                         response = f"{current_az:.1f}\n{current_el:.1f}\n"
                     conn.sendall(response.encode())
                     print(f"[TCP] Position sent: {response.strip()}")
+
+                if command == "S" or command == "q" :
+                    break  # Exit the loop to stop the server 
 
         conn.close()
         print("[TCP] Client disconnected")

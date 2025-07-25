@@ -8,7 +8,7 @@ TCP_HOST = "localhost"
 TCP_PORT = 4533
 
 # Serial parameters
-SERIAL_PORT = "COM4"   # Replace with your elevation COM port
+SERIAL_PORT = "COM7"   # Replace with your elevation COM port
 SERIAL_BAUD = 9600
 
 # Current elevation position (updated by serial feedback)
