@@ -26,10 +26,13 @@ def serial_reader(ser):
 
         if line.startswith("A="):
             parts = line.split()
-            az = float(parts[0][2:])
-            with lock:
-                current_az = az
-            print(f"[SERIAL] {line}")
+            try:
+                az = float(parts[0][2:])
+                with lock:
+                    current_az = az
+                print(f"[SERIAL] {line}")
+            except (ValueError, IndexError) as e:
+                print(f"[SERIAL] ERROR parsing azimuth: {line} | Exception: {e}")
 
         elif line.startswith("ERR="):
             print(f"[SERIAL] ERREUR: {line}")

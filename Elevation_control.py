@@ -32,13 +32,14 @@ def serial_reader(ser):
         # Expecting feedback in format: E=xxx.x S=x M or E=xxx.x S=x S
         if line.startswith("E="):
             parts = line.split()
-            el = float(parts[0][2:])  # Extract elevation value
-
-            # Thread-safe update of the shared variable
-            with lock:
-                current_el = el
-
-            print(f"[SERIAL] Feedback: {line}")
+            try:
+                el = float(parts[0][2:])  # Extract elevation value
+                # Thread-safe update of the shared variable
+                with lock:
+                    current_el = el
+                print(f"[SERIAL] Feedback: {line}")
+            except (ValueError, IndexError) as e:
+                print(f"[SERIAL] ERROR parsing elevation: {line} | Exception: {e}")
 
         elif line.startswith("ERR="):
             print(f"[SERIAL] ERROR: {line}")
